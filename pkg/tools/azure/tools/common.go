@@ -133,6 +133,24 @@ func AddOperation(field string, value any) webapi.JsonPatchOperation {
 	}
 }
 
+// SafeStringFromAny attempts to extract a string from a generic value.
+// Supports string, *string, and nil. Returns empty string for unsupported types.
+func SafeStringFromAny(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case *string:
+		if v != nil {
+			return *v
+		}
+		return ""
+	case nil:
+		return ""
+	default:
+		return ""
+	}
+}
+
 // Relation type mapping
 var RelationTypeMap = map[string]string{
 	"parent":   "System.LinkTypes.Hierarchy-Reverse",

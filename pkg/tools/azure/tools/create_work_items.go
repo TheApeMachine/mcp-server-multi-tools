@@ -183,12 +183,21 @@ func (tool *AzureCreateWorkItemsTool) Handler(ctx context.Context, request mcp.C
 			}
 		}
 
+		// Safely extract values without unsafe pointer type assertions
+		var createdTitle string
+		var createdType string
+		if createdWorkItem.Fields != nil {
+			fields := *createdWorkItem.Fields
+			createdTitle = SafeStringFromAny(fields["System.Title"])
+			createdType = SafeStringFromAny(fields["System.WorkItemType"])
+		}
+
 		itemResult := map[string]any{
 			"id":      workItemID,
-			"title":   SafeString((*createdWorkItem.Fields)["System.Title"].(*string)),
-			"type":    SafeString((*createdWorkItem.Fields)["System.WorkItemType"].(*string)),
+			"title":   createdTitle,
+			"type":    createdType,
 			"url":     fmt.Sprintf("%s/_workitems/edit/%d", tool.config.OrganizationURL, workItemID),
-			"message": fmt.Sprintf("Successfully created %s #%d.", SafeString((*createdWorkItem.Fields)["System.WorkItemType"].(*string)), workItemID),
+			"message": fmt.Sprintf("Successfully created %s #%d.", createdType, workItemID),
 		}
 		if parentLinkMsg != "" { // Add parent linking outcome to JSON if it happened
 			itemResult["parent_linking_status"] = parentLinkMsg
@@ -197,9 +206,9 @@ func (tool *AzureCreateWorkItemsTool) Handler(ctx context.Context, request mcp.C
 
 		if format != "json" {
 			text := fmt.Sprintf("Successfully created %s #%d: %s. URL: %s/_workitems/edit/%d",
-				SafeString((*createdWorkItem.Fields)["System.WorkItemType"].(*string)),
+				createdType,
 				workItemID,
-				SafeString((*createdWorkItem.Fields)["System.Title"].(*string)),
+				createdTitle,
 				tool.config.OrganizationURL, workItemID)
 			if parentLinkMsg != "" && !strings.HasPrefix(parentLinkMsg, "Work item #"+strconv.Itoa(workItemID)+" created and linked") {
 				// Append only if it's an error or a separate status for linking

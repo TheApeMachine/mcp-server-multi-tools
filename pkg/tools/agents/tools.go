@@ -103,8 +103,8 @@ func NewLaunchAgentTool(manager *AgentManager) core.Tool {
 		mcp.WithDescription("Launches a new agent with a given system and user prompt."),
 		mcp.WithString("system_prompt", mcp.Required(), mcp.Description("The system prompt for the agent.")),
 		mcp.WithString("user_prompt", mcp.Required(), mcp.Description("The initial user prompt or task for the agent.")),
-		mcp.WithNumber("temperature", mcp.Description("Controls creativity. Value between 0 and 2. Defaults to 1.")),
-		mcp.WithNumber("max_iterations", mcp.Description("The maximum number of iterations the agent can perform. Defaults to 10.")),
+		mcp.WithNumber("temperature", mcp.Required(), mcp.Description("Controls creativit versus accuracy. Value between 0 and 2. Defaults to 1.")),
+		mcp.WithNumber("max_iterations", mcp.Required(), mcp.Description("The maximum number of iterations the agent can perform. Defaults to 10.")),
 	)
 	return t
 }

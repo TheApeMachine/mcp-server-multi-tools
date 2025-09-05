@@ -225,34 +225,43 @@ func (tool *AzureGetWorkItemsTool) Handler(ctx context.Context, request mcp.Call
 
 	commentsMap := make(map[int][]string)
 	if includeComments {
-		// GetCommentsBatch API might be limited or less efficient for many items.
-		// The workitem expand might already bring some comment data or latest N comments if API supports.
-		// For now, using GetCommentsBatch as it was.
-		commentsBatchResult, err := tool.client.GetCommentsBatch(ctx, workitemtracking.GetCommentsBatchArgs{
-			Project: &tool.config.Project,
-			Ids:     &parsedIDs, // Max 200 IDs for GetCommentsBatch
-		})
-
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to get comments batch: %v", err)), nil
-		}
-
-		if commentsBatchResult != nil && commentsBatchResult.Comments != nil {
-			for _, comment := range *commentsBatchResult.Comments {
-				if comment.WorkItemId == nil || comment.Text == nil {
-					continue
+		// Fetch comments per work item to avoid batch API issues
+		for _, id := range parsedIDs {
+			pageSize := 50
+			var continuationToken *string
+			for {
+				commentsResult, err := tool.client.GetComments(ctx, workitemtracking.GetCommentsArgs{
+					Project:           &tool.config.Project,
+					WorkItemId:        &id,
+					Top:               &pageSize,
+					ContinuationToken: continuationToken,
+				})
+				if err != nil {
+					commentsMap[id] = append(commentsMap[id], fmt.Sprintf("[Failed to fetch comments: %v]", err))
+					break
 				}
-				workItemID := *comment.WorkItemId
-				author := "Unknown" // Default if CreatedBy or DisplayName is nil
-				if comment.CreatedBy != nil && comment.CreatedBy.DisplayName != nil {
-					author = *comment.CreatedBy.DisplayName
+				if commentsResult == nil || commentsResult.Comments == nil || len(*commentsResult.Comments) == 0 {
+					break
 				}
-				dateStr := "Unknown Date"
-				if comment.CreatedDate != nil {
-					dateStr = comment.CreatedDate.Time.Format("2006-01-02 15:04")
+				for _, c := range *commentsResult.Comments {
+					if c.Text == nil {
+						continue
+					}
+					author := "Unknown"
+					if c.CreatedBy != nil && c.CreatedBy.DisplayName != nil {
+						author = *c.CreatedBy.DisplayName
+					}
+					dateStr := "Unknown Date"
+					if c.CreatedDate != nil {
+						dateStr = c.CreatedDate.Time.Format("2006-01-02 15:04")
+					}
+					formatted := fmt.Sprintf("Author: %s | Date: %s\n%s", author, dateStr, *c.Text)
+					commentsMap[id] = append(commentsMap[id], formatted)
 				}
-				formattedComment := fmt.Sprintf("Author: %s | Date: %s\n%s", author, dateStr, *comment.Text)
-				commentsMap[workItemID] = append(commentsMap[workItemID], formattedComment)
+				if commentsResult.ContinuationToken == nil || *commentsResult.ContinuationToken == "" {
+					break
+				}
+				continuationToken = commentsResult.ContinuationToken
 			}
 		}
 	}
